@@ -54,6 +54,11 @@ class JanitorConfiguratorTests(configurators.ConfiguratorMixin, unittest.Synchro
         ('logs_build_data', {'build_data_horizon': timedelta(weeks=1),
                              'logHorizon': timedelta(weeks=1)},
          [LogChunksJanitor, BuildDataJanitor]),
+        ('horizon_per_builder', {'horizon_per_builder': {
+                                'b1': {
+                                'logHorizon': timedelta(weeks=1),
+                                'buildDataHorizon': timedelta(weeks=1)}}},
+         [LogChunksJanitor, BuildDataJanitor]),
     ])
     def test_steps(self, name, configuration, exp_steps):
         self.setupConfigurator(**configuration)
@@ -62,6 +67,26 @@ class JanitorConfiguratorTests(configurators.ConfiguratorMixin, unittest.Synchro
         self.expectScheduler(JANITOR_NAME + "_force", ForceScheduler)
         self.expectBuilderHasSteps(JANITOR_NAME, exp_steps)
         self.expectNoConfigError()
+
+
+class JanitorConfiguratorErrorsTests(TestBuildStepMixin,
+                            configmixin.ConfigErrorsMixin,
+                            TestReactorMixin,
+                            unittest.TestCase):
+
+    def test_BuildDataJanitor_InvalidConfig(self):
+        horizon_per_builder = {
+            "b1": {
+            "logHorizon": timedelta(weeks=1),
+            "buildDataHorizon": timedelta(weeks=1)
+            }
+        }
+        with self.assertRaisesConfigError("JanitorConfigurator: horizon_per_builder only " +
+                "possible without logHorizon and build_data_horizon set."):
+            self.setup_step(JanitorConfigurator(logHorizon=timedelta(weeks=1),
+                horizon_per_builder=horizon_per_builder))
+            self.setup_step(JanitorConfigurator(build_data_horizon=timedelta(weeks=1),
+                horizon_per_builder=horizon_per_builder))
 
 
 class LogChunksJanitorTests(TestBuildStepMixin,
@@ -87,7 +112,24 @@ class LogChunksJanitorTests(TestBuildStepMixin,
                            state_string="deleted 3 logchunks")
         yield self.run_step()
         expected_timestamp = datetime2epoch(datetime.datetime(year=2016, month=12, day=25))
-        self.master.db.logs.deleteOldLogChunks.assert_called_with(expected_timestamp)
+        self.master.db.logs.deleteOldLogChunks.assert_called_with(
+            older_than_timestamp=expected_timestamp)
+
+    @defer.inlineCallbacks
+    def test_LogChunksJanitorHorizon_PerBuilder(self):
+        config = {
+            "b1": {
+            "logHorizon": timedelta(weeks=1),
+            "buildDataHorizon": timedelta(weeks=1)
+            }
+        }
+        self.setup_step(LogChunksJanitor(horizon_per_builder=config))
+        self.master.db.logs.deleteOldLogChunks = mock.Mock(return_value=3)
+        self.expect_outcome(result=SUCCESS,
+                           state_string="deleted 3 logchunks")
+        yield self.run_step()
+        self.master.db.logs.deleteOldLogChunks.assert_called_with(
+            horizon_per_builder=config)
 
     @defer.inlineCallbacks
     def test_build_data(self):
@@ -96,4 +138,20 @@ class LogChunksJanitorTests(TestBuildStepMixin,
         self.expect_outcome(result=SUCCESS, state_string="deleted 4 build data key-value pairs")
         yield self.run_step()
         expected_timestamp = datetime2epoch(datetime.datetime(year=2016, month=12, day=25))
-        self.master.db.build_data.deleteOldBuildData.assert_called_with(expected_timestamp)
+        self.master.db.build_data.deleteOldBuildData.assert_called_with(
+            older_than_timestamp=expected_timestamp)
+
+    @defer.inlineCallbacks
+    def test_BuildDataJanitor_horizon_per_builder(self):
+        config = {
+            "b1": {
+            "logHorizon": timedelta(weeks=1),
+            "buildDataHorizon": timedelta(weeks=1)
+            }
+        }
+        self.setup_step(BuildDataJanitor(horizon_per_builder=config))
+        self.master.db.build_data.deleteOldBuildData = mock.Mock(return_value=4)
+        self.expect_outcome(result=SUCCESS, state_string="deleted 4 build data key-value pairs")
+        yield self.run_step()
+        self.master.db.build_data.deleteOldBuildData.assert_called_with(
+            horizon_per_builder=config)

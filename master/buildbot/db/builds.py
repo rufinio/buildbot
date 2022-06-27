@@ -23,6 +23,8 @@ from twisted.internet import defer
 from buildbot.db import NULL
 from buildbot.db import base
 from buildbot.util import epoch2datetime
+from buildbot.util import datetime2epoch
+from datetime import datetime
 
 
 class BuildsConnectorComponent(base.DBConnectorComponent):
@@ -257,3 +259,47 @@ class BuildsConnectorComponent(base.DBConnectorComponent):
             complete_at=epoch2datetime(row.complete_at),
             state_string=row.state_string,
             results=row.results)
+
+    # returns a Deferred that returns a value
+    def deleteOldBuilds(self, horizon_per_builder=None):
+        builds = self.db.model.builds
+        builders = self.db.model.builders
+
+        def countBuilds(conn):
+            res = conn.execute(sa.select([sa.func.count(builds.c.id)]))
+            count = res.fetchone()[0]
+            res.close()
+            return count
+
+        def thdDeleteOldBuilds(conn):
+            count_before = countBuilds(conn)
+
+            for builderName in horizon_per_builder:
+                if "buildHorizon" in horizon_per_builder[builderName]:
+                    older_than_timestamp = datetime2epoch(datetime.now() -
+                        horizon_per_builder[builderName]["buildHorizon"])
+                    if self.db._engine.dialect.name == 'sqlite':
+                        # sqlite does not support delete with a join,
+                        # so for this case we use a subquery,
+                        # which is much slower
+
+                        q = sa.select([builds.c.id])
+                        q = q.where(sa.and_((builds.c.builderid == builders.c.id,
+                            builds.c.complete_at < older_than_timestamp),
+                            builders.c.name.like(builderName)))
+                        q = builds.delete().where(builds.c.id.in_(q))
+
+                    else:
+                        q = builds.delete()
+                        q = q.where(sa.and_(builds.c.builderid == builders.c.id,
+                                            builds.c.complete_at < older_than_timestamp,
+                                            builders.c.name.like(builderName)))
+
+                    res = conn.execute(q)
+                    res.close()
+
+            count_after = countBuilds(conn)
+
+            return count_before - count_after
+
+        return self.db.pool.do(thdDeleteOldBuilds)

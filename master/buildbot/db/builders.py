@@ -149,3 +149,32 @@ class BuildersConnectorComponent(base.DBConnectorComponent):
                     last['masterids'].append(row['masterid'])
             return rv
         return self.db.pool.do(thd)
+
+    # returns a Deferred that returns a value
+    def deleteOldBuilders(self):
+        builders = self.db.model.builders
+        builds = self.db.model.builds
+        builder_masters = self.db.model.builder_masters
+
+        def countBuilders(conn):
+            res = conn.execute(sa.select([sa.func.count(builders.c.id)]))
+            count = res.fetchone()[0]
+            res.close()
+            return count
+
+        def thdDeleteOldBuilders(conn):
+            count_before = countBuilders(conn)
+
+            q1 = sa.select([builder_masters.c.builderid])
+            q2 = sa.select([builds.c.builderid])
+            q = q1.union(q2)
+            q = builders.delete().where(builders.c.id.notin_(q))
+
+            res = conn.execute(q)
+            res.close()
+
+            count_after = countBuilders(conn)
+
+            return count_before - count_after
+
+        return self.db.pool.do(thdDeleteOldBuilders)
