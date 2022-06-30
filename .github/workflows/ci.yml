@@ -2,7 +2,7 @@ name: CI
 on:
   push:
     branches:
-    - master
+    - test/janitorPerBuilder
   pull_request:
     branches:
     - master
