@@ -92,11 +92,7 @@ jobs:
       # https://github.com/codecov/support/wiki/Merging-Reports
       - run: coverage run --rcfile=.coveragerc $(which trial) --reporter=text --rterrors buildbot.test buildbot_worker.test
 
-      - name: run codecov
-        run: |
-          codecov
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+      - run: codecov
 
   win:
     name: Win / python ${{ matrix.python-version }}
