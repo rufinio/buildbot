@@ -16,6 +16,10 @@
 from twisted.internet import defer
 from twisted.trial import unittest
 
+from datetime import timedelta
+
+from parameterized import parameterized
+
 from buildbot.data import resultspec
 from buildbot.db import builds
 from buildbot.test import fakedb
@@ -121,6 +125,11 @@ class Tests(interfaces.InterfaceTests):
     def test_signature_setBuildProperty(self):
         @self.assertArgSpecMatches(self.db.builds.setBuildProperty)
         def setBuildProperty(self, bid, name, value, source):
+            pass
+
+    def test_signature_deleteOldBuilds(self):
+        @self.assertArgSpecMatches(self.db.builds.deleteOldBuilds)
+        def deleteOldBuilds(self, horizon_per_builder=None):
             pass
 
     # method tests
@@ -357,6 +366,11 @@ class Tests(interfaces.InterfaceTests):
         props = yield self.db.builds.getBuildProperties(50)
         self.assertEqual(props, {'prop': (45, 'test_source')})
 
+    @defer.inlineCallbacks
+    def test_deleteOldBuilds(self):
+        deleteOldBuilds = yield self.db.builds.deleteOldBuilds(horizon_per_builder='')
+        self.assertEqual(deleteOldBuilds, 0)
+
 
 class RealTests(Tests):
 
@@ -489,6 +503,32 @@ class RealTests(Tests):
             validation.verifyDbDict(self, 'dbbuilddict', bdict)
         self.assertEqual(sorted(bdicts, key=lambda bd: bd['id']),
                          [self.threeBdicts[50], self.threeBdicts[51]])
+
+    @parameterized.expand([
+        (
+        {
+            "b1": {
+                "buildHorizon": timedelta(weeks=1)
+            }
+        }, 1),
+        (
+        {
+            "b2": {
+                "buildHorizon": timedelta(weeks=1)
+            }
+        }, 0),
+        (
+        {
+            "b3": {
+                "buildHorizon": timedelta(weeks=1)
+            }
+        }, 0)
+    ])
+    @defer.inlineCallbacks
+    def test_deleteOldBuilds_real(self, config, exp_deleted):
+        yield self.insertTestData(self.backgroundData + self.threeBuilds)
+        deleteOldBuilds = yield self.db.builds.deleteOldBuilds(horizon_per_builder=config)
+        self.assertEqual(deleteOldBuilds, exp_deleted)
 
 
 class TestFakeDB(unittest.TestCase, connector_component.FakeConnectorComponentMixin, Tests):

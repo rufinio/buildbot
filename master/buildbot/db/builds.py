@@ -284,9 +284,12 @@ class BuildsConnectorComponent(base.DBConnectorComponent):
                         # which is much slower
 
                         q = sa.select([builds.c.id])
-                        q = q.where(sa.and_((builds.c.builderid == builders.c.id,
-                            builds.c.complete_at < older_than_timestamp),
-                            builders.c.name.like(builderName)))
+                        #q = q.where(sa.and_((builds.c.builderid == builders.c.id,
+                        #    builds.c.complete_at < older_than_timestamp),
+                        #    builders.c.name.like(builderName)))
+                        q = q.where(sa.and_((builds.c.complete_at < older_than_timestamp),
+                                             builds.c.builderid == builders.c.id,
+                                             builders.c.name.like(builderName)))
                         q = builds.delete().where(builds.c.id.in_(q))
 
                     else:

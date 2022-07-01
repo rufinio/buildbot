@@ -199,3 +199,7 @@ class FakeBuildsComponent(FakeDBComponent):
             del result['buildsetid']
 
         return results
+
+    def deleteOldBuilds(self, horizon_per_builder):
+        return defer.succeed(0)
+
