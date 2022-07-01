@@ -68,6 +68,11 @@ class Tests(interfaces.InterfaceTests):
         def updateBuilderInfo(self, builderid, description, tags):
             pass
 
+    def test_signature_deleteOldBuilders(self):
+        @self.assertArgSpecMatches(self.db.builders.deleteOldBuilders)
+        def deleteOldBuilders(self):
+            pass
+
     @defer.inlineCallbacks
     def test_updateBuilderInfo(self):
         yield self.insertTestData([
@@ -257,6 +262,22 @@ class Tests(interfaces.InterfaceTests):
         builderlist = yield self.db.builders.getBuilders()
         self.assertEqual(sorted(builderlist), [])
 
+    @defer.inlineCallbacks
+    def test_deleteOldBuilders(self):
+        yield self.insertTestData([
+            fakedb.Buildset(id=20),
+            fakedb.Builder(id=77, name="b1"),
+            fakedb.Builder(id=88, name="b2"),
+            fakedb.BuildRequest(id=42, buildsetid=20, builderid=88),
+            fakedb.Worker(id=13, name='wrk'),
+            fakedb.Master(id=88),
+            fakedb.Build(id=50, buildrequestid=42, number=5, masterid=88,
+                         builderid=77, workerid=13, state_string="build 5",
+                         started_at=1304262222)
+        ])
+
+        deleted = yield self.db.builders.deleteOldBuilders()
+        self.assertEqual(deleted, 1)
 
 class RealTests(Tests):
 
@@ -279,8 +300,8 @@ class TestRealDB(unittest.TestCase,
     @defer.inlineCallbacks
     def setUp(self):
         yield self.setUpConnectorComponent(
-            table_names=['builders', 'masters', 'builder_masters',
-                         'builders_tags', 'tags'])
+            table_names=['builds', 'builders', 'masters', 'builder_masters',
+                         'builders_tags', 'tags', 'buildrequests', 'buildsets', 'workers'])
 
         self.db.builders = builders.BuildersConnectorComponent(self.db)
         self.db.tags = tags.TagsConnectorComponent(self.db)

@@ -149,3 +149,6 @@ class FakeBuildersComponent(FakeDBComponent):
         row['tags'] = [self.db.tags.tags[tagid]['name']
                        for tagid in self.builders_tags.get(row['id'], [])]
         return row
+
+    def deleteOldBuilders(self):
+        return defer.succeed(1)
