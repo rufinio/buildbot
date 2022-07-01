@@ -200,6 +200,6 @@ class FakeBuildsComponent(FakeDBComponent):
 
         return results
 
-    def deleteOldBuilds(self, horizon_per_builder):
+    def deleteOldBuilds(self, horizon_per_builder=None):
         return defer.succeed(0)
 
