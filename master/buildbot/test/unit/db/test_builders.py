@@ -279,6 +279,7 @@ class Tests(interfaces.InterfaceTests):
         deleted = yield self.db.builders.deleteOldBuilders()
         self.assertEqual(deleted, 1)
 
+
 class RealTests(Tests):
 
     # tests that only "real" implementations will pass
