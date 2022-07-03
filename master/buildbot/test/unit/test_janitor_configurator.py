@@ -27,6 +27,8 @@ from twisted.trial import unittest
 from buildbot.configurators import janitor
 from buildbot.configurators.janitor import JANITOR_NAME
 from buildbot.configurators.janitor import BuildDataJanitor
+from buildbot.configurators.janitor import BuildsJanitor
+from buildbot.configurators.janitor import BuildersJanitor
 from buildbot.configurators.janitor import JanitorConfigurator
 from buildbot.configurators.janitor import LogChunksJanitor
 from buildbot.process.results import SUCCESS
@@ -155,3 +157,25 @@ class LogChunksJanitorTests(TestBuildStepMixin,
         yield self.run_step()
         self.master.db.build_data.deleteOldBuildData.assert_called_with(
             horizon_per_builder=config)
+
+    @defer.inlineCallbacks
+    def test_BuildsJanitor_horizon_per_builder(self):
+        config = {
+            "b1": {
+            "buildsHorizon": timedelta(weeks=1)
+            }
+        }
+        self.setup_step(BuildsJanitor(horizon_per_builder=config))
+        self.master.db.builds.deleteOldBuilds = mock.Mock(return_value=3)
+        self.expect_outcome(result=SUCCESS, state_string="deleted 3 builds")
+        yield self.run_step()
+        self.master.db.builds.deleteOldBuilds.assert_called_with(
+            horizon_per_builder=config)
+
+    @defer.inlineCallbacks
+    def test_BuildersJanitor_horizon_per_builder(self):
+        self.setup_step(BuildersJanitor())
+        self.master.db.builders.deleteOldBuilders = mock.Mock(return_value=3)
+        self.expect_outcome(result=SUCCESS, state_string="deleted 3 builders")
+        yield self.run_step()
+        self.master.db.builders.deleteOldBuilders.assert_called_with()

@@ -108,7 +108,7 @@ class BuildersJanitor(BuildStep):
     @defer.inlineCallbacks
     def run(self):
         deleted = yield self.master.db.builders.deleteOldBuilders()
-        self.descriptionDone = ["deleted", str(deleted), "builder"]
+        self.descriptionDone = ["deleted", str(deleted), "builders"]
         return SUCCESS
 
 
